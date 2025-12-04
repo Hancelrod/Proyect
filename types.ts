@@ -3,6 +3,7 @@ export interface Photo {
   url: string;
   caption?: string;
   date?: string;
+  isStatic?: boolean;
 }
 
 export interface TimeElapsed {
