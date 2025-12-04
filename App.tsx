@@ -1,75 +1,36 @@
+
 import React, { useState } from 'react';
 import HeartBackground from './components/HeartBackground';
 import TimeCounter from './components/TimeCounter';
 import LoveGenerator from './components/LoveGenerator';
 import { Photo } from './types';
-import { Camera, Heart, Infinity, Upload, Trash2, Save, X, Copy, Check } from 'lucide-react';
-
-// --- ZONA DE CONFIGURACIÓN DE FOTOS ---
-// 1. Sube tus fotos en la página web usando el botón "Subir Foto".
-// 2. Pulsa el botón "💾 Guardar Fotos en Código" que aparecerá abajo.
-// 3. Copia el texto que te dará y pégalo sustituyendo TODO este bloque 'const MEMORIES = [...]'.
-const MEMORIES: Photo[] = [
-  { 
-    id: 'static-1', 
-    url: 'https://images.unsplash.com/photo-1516589178581-a81ca852adce?q=80&w=2070&auto=format&fit=crop', 
-    caption: 'El inicio de nuestra aventura', 
-    isStatic: true 
-  },
-  { 
-    id: 'static-2', 
-    url: 'https://images.unsplash.com/photo-1511285560982-1356c11d4606?q=80&w=2076&auto=format&fit=crop', 
-    caption: 'Momentos inolvidables', 
-    isStatic: true 
-  },
-  { 
-    id: 'static-3', 
-    url: 'https://images.unsplash.com/photo-1621621667797-e06afc217fb0?q=80&w=2070&auto=format&fit=crop', 
-    caption: 'Tú y yo, siempre', 
-    isStatic: true 
-  },
-];
+import { GALLERY_IMAGES } from './gallery';
+import { Camera, Heart, Infinity, Upload, Trash2 } from 'lucide-react';
 
 const App: React.FC = () => {
-  const [photos, setPhotos] = useState<Photo[]>(MEMORIES);
-  const [showConfigModal, setShowConfigModal] = useState(false);
-  const [configCode, setConfigCode] = useState('');
-  const [copied, setCopied] = useState(false);
+  // Inicializamos las fotos cargando desde el archivo de configuración gallery.ts
+  const initialPhotos: Photo[] = GALLERY_IMAGES.map((img, index) => {
+    // Si empieza por http es una URL externa, si no, buscamos en la carpeta 'photos'
+    const url = img.filename.startsWith('http') || img.filename.startsWith('data:') 
+      ? img.filename 
+      : `photos/${img.filename}`;
+      
+    return {
+      id: `static-${index}`,
+      url: url,
+      caption: img.caption,
+      isStatic: true
+    };
+  });
 
-  // Función para redimensionar y convertir imagen a Base64
+  const [photos, setPhotos] = useState<Photo[]>(initialPhotos);
+
+  // Función para previsualizar imágenes subidas al momento (no se guardan permanentemente)
   const processImage = (file: File): Promise<string> => {
     return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
-          // Redimensionamos a máximo 800px para no saturar el código
-          const MAX_WIDTH = 800;
-          const MAX_HEIGHT = 800;
-
-          if (width > height) {
-            if (width > MAX_WIDTH) {
-              height *= MAX_WIDTH / width;
-              width = MAX_WIDTH;
-            }
-          } else {
-            if (height > MAX_HEIGHT) {
-              width *= MAX_HEIGHT / height;
-              height = MAX_HEIGHT;
-            }
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, width, height);
-          // Convertimos a JPEG calidad 0.7 para reducir tamaño
-          resolve(canvas.toDataURL('image/jpeg', 0.7)); 
-        };
-        img.src = e.target?.result as string;
+        resolve(e.target?.result as string);
       };
       reader.readAsDataURL(file);
     });
@@ -83,8 +44,8 @@ const App: React.FC = () => {
         const newPhoto: Photo = {
           id: Date.now().toString(),
           url: base64Url,
-          caption: 'Nuevo recuerdo...',
-          isStatic: true // Al subirlas aquí asumimos que el usuario querrá guardarlas
+          caption: 'Nuevo recuerdo (temporal)...',
+          isStatic: false
         };
         setPhotos([newPhoto, ...photos]);
       } catch (error) {
@@ -95,19 +56,6 @@ const App: React.FC = () => {
 
   const handleDeletePhoto = (id: string) => {
     setPhotos(prevPhotos => prevPhotos.filter(photo => photo.id !== id));
-  };
-
-  const generateConfig = () => {
-    const codeString = `const MEMORIES: Photo[] = ${JSON.stringify(photos, null, 2)};`;
-    setConfigCode(codeString);
-    setShowConfigModal(true);
-    setCopied(false);
-  };
-
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(configCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -146,8 +94,9 @@ const App: React.FC = () => {
             <Infinity className="w-8 h-8 text-purple-400" />
             Galería de Recuerdos
           </h2>
-          <p className="text-gray-400 font-light">
-            Sube tus fotos aquí para ver cómo quedan. Cuando te gusten, pulsa "Guardar Fotos en Código".
+          <p className="text-gray-400 font-light max-w-xl mx-auto">
+            Todas nuestras fotos guardadas se cargan automáticamente desde la carpeta. 
+            También puedes subir una temporalmente aquí para ver cómo queda.
           </p>
         </div>
 
@@ -157,17 +106,9 @@ const App: React.FC = () => {
               <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
               <div className="flex items-center gap-3 bg-white/10 hover:bg-white/20 border border-white/20 px-8 py-4 rounded-full transition-all hover:scale-105 hover:neon-glow">
                 <Upload className="w-5 h-5 text-pink-400" />
-                <span className="font-future text-sm tracking-wide">SUBIR FOTO</span>
+                <span className="font-future text-sm tracking-wide">SUBIR FOTO TEMPORAL</span>
               </div>
            </label>
-
-           <button 
-             onClick={generateConfig}
-             className="flex items-center gap-3 bg-pink-600/80 hover:bg-pink-500 border border-pink-500/50 px-8 py-4 rounded-full transition-all hover:scale-105 shadow-lg shadow-pink-500/20"
-           >
-              <Save className="w-5 h-5 text-white" />
-              <span className="font-future text-sm tracking-wide text-white">GUARDAR FOTOS EN CÓDIGO</span>
-           </button>
         </div>
 
         {/* Grid */}
@@ -175,17 +116,19 @@ const App: React.FC = () => {
           {photos.map((photo) => (
             <div key={photo.id} className="group relative aspect-square rounded-xl overflow-hidden glass-panel transform transition-all hover:-translate-y-2 hover:shadow-[0_0_30px_rgba(236,72,153,0.4)]">
               
-              <button 
-                onClick={() => handleDeletePhoto(photo.id)}
-                className="absolute top-3 right-3 z-30 p-2 bg-red-500/80 rounded-full text-white opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-red-600 hover:scale-110 shadow-lg"
-                title="Eliminar recuerdo"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+              {!photo.isStatic && (
+                <button 
+                  onClick={() => handleDeletePhoto(photo.id)}
+                  className="absolute top-3 right-3 z-30 p-2 bg-red-500/80 rounded-full text-white opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-red-600 hover:scale-110 shadow-lg"
+                  title="Eliminar recuerdo temporal"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
 
               <img 
                 src={photo.url} 
-                alt="Memory" 
+                alt={photo.caption} 
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
               />
               
@@ -194,7 +137,9 @@ const App: React.FC = () => {
                 <p className="text-white font-love text-2xl">{photo.caption || 'Recuerdo eterno'}</p>
                 <div className="flex items-center gap-2 text-pink-400 mt-2">
                   <Camera className="w-4 h-4" />
-                  <span className="text-xs font-future tracking-wider">MOMENTO ETERNO</span>
+                  <span className="text-xs font-future tracking-wider">
+                    {photo.isStatic ? 'MOMENTO GUARDADO' : 'VISTA PREVIA'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -216,42 +161,6 @@ const App: React.FC = () => {
            TE AMO
         </div>
       </footer>
-
-      {/* Config Export Modal */}
-      {showConfigModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-[fadeIn_0.3s_ease-out]">
-          <div className="bg-[#111] border border-gray-700 rounded-2xl w-full max-w-3xl max-h-[80vh] flex flex-col shadow-2xl">
-            <div className="flex justify-between items-center p-6 border-b border-gray-800">
-              <h3 className="text-xl font-future text-white flex items-center gap-2">
-                <Save className="text-pink-500" />
-                Guarda tus Recuerdos
-              </h3>
-              <button onClick={() => setShowConfigModal(false)} className="text-gray-400 hover:text-white transition-colors">
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            
-            <div className="p-6 overflow-y-auto flex-1 space-y-4">
-              <p className="text-gray-300 text-sm leading-relaxed">
-                Para que estas fotos se queden fijas para siempre, copia el código de abajo y sustituye la constante <code className="text-pink-400 bg-pink-900/20 px-1 rounded">MEMORIES</code> en el archivo <code className="text-pink-400 bg-pink-900/20 px-1 rounded">App.tsx</code>.
-              </p>
-              
-              <div className="relative group">
-                <pre className="bg-black border border-gray-800 rounded-xl p-4 text-xs text-green-400 font-mono overflow-x-auto whitespace-pre-wrap break-all max-h-[400px]">
-                  {configCode}
-                </pre>
-                <button 
-                  onClick={copyToClipboard}
-                  className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 backdrop-blur-md text-white px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 border border-white/20"
-                >
-                  {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
-                  {copied ? '¡COPIADO!' : 'COPIAR CÓDIGO'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
